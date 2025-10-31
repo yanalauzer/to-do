@@ -100,7 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
   `;
   document.head.appendChild(style);
 
-  // Основные элементы 
+  // Заголовок
   const title = document.createElement("h1");
   title.textContent = "Мой ToDo-лист";
 
@@ -110,19 +110,16 @@ document.addEventListener("DOMContentLoaded", () => {
   search.type = "text";
   search.placeholder = "Поиск задачи...";
 
+  // Форма
   const form = document.createElement("form");
-
-  // Поле для текста
   const input = document.createElement("input");
   input.type = "text";
   input.placeholder = "Название задачи";
   input.required = true;
 
-  // Поле для даты
   const dateInput = document.createElement("input");
   dateInput.type = "date";
 
-  // Выпадающие списки времени
   const hoursSelect = document.createElement("select");
   const minutesSelect = document.createElement("select");
 
@@ -140,13 +137,12 @@ document.addEventListener("DOMContentLoaded", () => {
     minutesSelect.append(opt);
   }
 
-  // Кнопка добавления
   const addBtn = document.createElement("button");
   addBtn.type = "submit";
   addBtn.textContent = "Добавить";
-
   form.append(input, dateInput, hoursSelect, minutesSelect, addBtn);
 
+  // Разделы
   const listsContainer = document.createElement("div");
   listsContainer.className = "lists";
 
@@ -166,31 +162,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.body.append(title, search, form, listsContainer);
 
-  // Хранилище 
+  // Логика
   let tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
   sortTasks();
   reloadLists();
 
-  // Добавление задачи 
-  form.onsubmit = e => {
+  form.addEventListener("submit", e => {
     e.preventDefault();
     const text = input.value.trim();
     const date = dateInput.value;
     const time = `${hoursSelect.value}:${minutesSelect.value}`;
     if (!text || !date) return;
-
     const task = { text, date, time, done: false };
     tasks.push(task);
     sortTasks();
     save();
     reloadLists();
     form.reset();
-  };
+  });
 
-  // Поиск задач
-  search.oninput = () => reloadLists();
+  search.addEventListener("input", () => reloadLists());
 
-  // Отображение задачи 
+  function formatDateRus(dateStr) {
+    const [year, month, day] = dateStr.split("-");
+    return `${day}.${month}.${year}`;
+  }
+
   function addTaskToDOM(task, list) {
     const li = document.createElement("li");
     li.draggable = !task.done;
@@ -200,35 +197,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const span = document.createElement("span");
     span.textContent = task.text;
-    span.onclick = () => editTask(li, task);
+    span.addEventListener("click", () => editTask(li, task));
 
     const time = document.createElement("div");
     time.className = "task-time";
-    time.textContent = `${task.date} ${task.time}`;
-
+    time.textContent = `${formatDateRus(task.date)} ${task.time}`;
     info.append(span, time);
 
     const doneBtn = document.createElement("button");
     doneBtn.textContent = "✓";
-    doneBtn.onclick = () => {
+    doneBtn.addEventListener("click", () => {
       task.done = !task.done;
       save();
       reloadLists();
-    };
+    });
 
     const delBtn = document.createElement("button");
     delBtn.textContent = "✗";
-    delBtn.onclick = () => {
+    delBtn.addEventListener("click", () => {
       tasks = tasks.filter(t => t !== task);
       save();
       reloadLists();
-    };
+    });
 
     li.append(doneBtn, info, delBtn);
     if (task.done) li.classList.add("done");
-    list.appendChild(li);
+    list.append(li);
 
-    // Drag & Drop для невыполненных задач
     if (!task.done) {
       li.addEventListener("dragstart", () => li.classList.add("dragging"));
       li.addEventListener("dragend", () => {
@@ -238,9 +233,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Редактирование задачи (название, дата, время)
   function editTask(li, task) {
-    li.innerHTML = "";
+    li.textContent = "";
     const textEdit = document.createElement("input");
     textEdit.className = "edit";
     textEdit.value = task.text;
@@ -255,21 +249,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const saveBtn = document.createElement("button");
     saveBtn.textContent = "💾";
-    saveBtn.onclick = () => {
+    saveBtn.addEventListener("click", () => {
       task.text = textEdit.value.trim() || task.text;
       task.date = dateEdit.value || task.date;
       task.time = timeEdit.value || task.time;
       sortTasks();
       save();
       reloadLists();
-    };
+    });
 
     li.append(textEdit, dateEdit, timeEdit, saveBtn);
   }
 
   function reloadLists() {
-    todoList.innerHTML = "";
-    doneList.innerHTML = "";
+    todoList.textContent = "";
+    doneList.textContent = "";
     sortTasks();
     const query = search.value.trim().toLowerCase();
     tasks
@@ -289,29 +283,22 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem("tasks", JSON.stringify(tasks));
   }
 
-  // Drag-and-drop логика
   todoList.addEventListener("dragover", e => {
     e.preventDefault();
     const dragging = document.querySelector(".dragging");
-    const afterElement = getDragAfterElement(todoList, e.clientY);
-    if (afterElement == null) {
-      todoList.appendChild(dragging);
-    } else {
-      todoList.insertBefore(dragging, afterElement);
-    }
+    const after = getDragAfterElement(todoList, e.clientY);
+    if (!after) todoList.append(dragging);
+    else todoList.insertBefore(dragging, after);
   });
 
   function getDragAfterElement(container, y) {
-    const draggableElements = [...container.querySelectorAll("li:not(.dragging)")];
-    return draggableElements.reduce(
+    const els = [...container.querySelectorAll("li:not(.dragging)")];
+    return els.reduce(
       (closest, child) => {
         const box = child.getBoundingClientRect();
         const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-          return { offset, element: child };
-        } else {
-          return closest;
-        }
+        if (offset < 0 && offset > closest.offset) return { offset, element: child };
+        else return closest;
       },
       { offset: Number.NEGATIVE_INFINITY }
     ).element;
