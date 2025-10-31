@@ -56,6 +56,14 @@ document.addEventListener("DOMContentLoaded", () => {
     .task-info { flex: 1; margin: 0 10px; }
     .task-time { font-size: 12px; color: #777; }
     .done span { text-decoration: line-through; opacity: 0.6; }
+    input.edit {
+      border: none;
+      background: #eef;
+      border-radius: 5px;
+      padding: 4px;
+      width: 90%;
+      font-size: 14px;
+    }
   `;
   document.head.appendChild(style);
 
@@ -100,6 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Хранилище 
   let tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
+  sortTasks(); // сортировка при загрузке
   tasks.forEach(addTaskToDOM);
 
   // Добавление задачи 
@@ -111,8 +120,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const task = { text, time, done: false };
     tasks.push(task);
+    sortTasks(); // сортировка после добавления
     save();
-    addTaskToDOM(task);
+    reloadList();
     form.reset();
   };
 
@@ -125,6 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const span = document.createElement("span");
     span.textContent = task.text;
+    span.onclick = () => editTask(span, task);
 
     const time = document.createElement("div");
     time.className = "task-time";
@@ -151,6 +162,35 @@ document.addEventListener("DOMContentLoaded", () => {
     li.append(doneBtn, info, delBtn);
     if (task.done) li.classList.add("done");
     list.appendChild(li);
+  }
+
+  // Редактирование задачи
+  function editTask(span, task) {
+    const inputEdit = document.createElement("input");
+    inputEdit.value = task.text;
+    inputEdit.className = "edit";
+    span.replaceWith(inputEdit);
+    inputEdit.focus();
+
+    inputEdit.onkeydown = e => {
+      if (e.key === "Enter") {
+        task.text = inputEdit.value.trim() || task.text;
+        save();
+        reloadList();
+      }
+    };
+
+    inputEdit.onblur = () => reloadList();
+  }
+
+  function reloadList() {
+    list.innerHTML = "";
+    sortTasks();
+    tasks.forEach(addTaskToDOM);
+  }
+
+  function sortTasks() {
+    tasks.sort((a, b) => a.time.localeCompare(b.time));
   }
 
   function save() {
