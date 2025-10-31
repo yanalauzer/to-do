@@ -31,6 +31,16 @@ document.addEventListener("DOMContentLoaded", () => {
       padding: 8px;
       font-size: 14px;
     }
+    #search {
+      margin-bottom: 20px;
+      padding: 10px;
+      width: 280px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      font-size: 14px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
     button {
       cursor: pointer;
       border: none;
@@ -65,6 +75,11 @@ document.addEventListener("DOMContentLoaded", () => {
       align-items: center;
       justify-content: space-between;
       box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+      cursor: grab;
+    }
+    li.dragging {
+      opacity: 0.5;
+      transform: scale(0.98);
     }
     .task-info { flex: 1; margin: 0 10px; }
     .task-time { font-size: 12px; color: #777; }
@@ -88,6 +103,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // Основные элементы 
   const title = document.createElement("h1");
   title.textContent = "Мой ToDo-лист";
+
+  // Поиск
+  const search = document.createElement("input");
+  search.id = "search";
+  search.type = "text";
+  search.placeholder = "Поиск задачи...";
 
   const form = document.createElement("form");
 
@@ -126,7 +147,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   form.append(input, dateInput, hoursSelect, minutesSelect, addBtn);
 
-  // Контейнер для списков
   const listsContainer = document.createElement("div");
   listsContainer.className = "lists";
 
@@ -144,7 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
   doneSection.append(doneTitle, doneList);
   listsContainer.append(todoSection, doneSection);
 
-  document.body.append(title, form, listsContainer);
+  document.body.append(title, search, form, listsContainer);
 
   // Хранилище 
   let tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
@@ -167,9 +187,13 @@ document.addEventListener("DOMContentLoaded", () => {
     form.reset();
   };
 
+  // Поиск задач
+  search.oninput = () => reloadLists();
+
   // Отображение задачи 
   function addTaskToDOM(task, list) {
     const li = document.createElement("li");
+    li.draggable = !task.done;
 
     const info = document.createElement("div");
     info.className = "task-info";
@@ -180,7 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const time = document.createElement("div");
     time.className = "task-time";
-    time.textContent = `📅 ${task.date} ⏰ ${task.time}`;
+    time.textContent = `${task.date} ${task.time}`;
 
     info.append(span, time);
 
@@ -203,6 +227,15 @@ document.addEventListener("DOMContentLoaded", () => {
     li.append(doneBtn, info, delBtn);
     if (task.done) li.classList.add("done");
     list.appendChild(li);
+
+    // Drag & Drop для невыполненных задач
+    if (!task.done) {
+      li.addEventListener("dragstart", () => li.classList.add("dragging"));
+      li.addEventListener("dragend", () => {
+        li.classList.remove("dragging");
+        updateOrder();
+      });
+    }
   }
 
   // Редактирование задачи
@@ -224,15 +257,16 @@ document.addEventListener("DOMContentLoaded", () => {
     inputEdit.onblur = () => reloadLists();
   }
 
-  // Перерисовка списков
   function reloadLists() {
     todoList.innerHTML = "";
     doneList.innerHTML = "";
     sortTasks();
-    tasks.forEach(t => addTaskToDOM(t, t.done ? doneList : todoList));
+    const query = search.value.trim().toLowerCase();
+    tasks
+      .filter(t => t.text.toLowerCase().includes(query))
+      .forEach(t => addTaskToDOM(t, t.done ? doneList : todoList));
   }
 
-  // Сортировка по дате и времени
   function sortTasks() {
     tasks.sort((a, b) => {
       if (a.date === b.date) return a.time.localeCompare(b.time);
@@ -242,5 +276,46 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function save() {
     localStorage.setItem("tasks", JSON.stringify(tasks));
+  }
+
+  // Drag-and-drop логика
+  todoList.addEventListener("dragover", e => {
+    e.preventDefault();
+    const dragging = document.querySelector(".dragging");
+    const afterElement = getDragAfterElement(todoList, e.clientY);
+    if (afterElement == null) {
+      todoList.appendChild(dragging);
+    } else {
+      todoList.insertBefore(dragging, afterElement);
+    }
+  });
+
+  function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll("li:not(.dragging)")];
+    return draggableElements.reduce(
+      (closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset, element: child };
+        } else {
+          return closest;
+        }
+      },
+      { offset: Number.NEGATIVE_INFINITY }
+    ).element;
+  }
+
+  function updateOrder() {
+    const newOrder = [];
+    const items = todoList.querySelectorAll("li");
+    items.forEach(li => {
+      const text = li.querySelector("span").textContent;
+      const task = tasks.find(t => t.text === text && !t.done);
+      if (task) newOrder.push(task);
+    });
+    const doneTasks = tasks.filter(t => t.done);
+    tasks = [...newOrder, ...doneTasks];
+    save();
   }
 });
