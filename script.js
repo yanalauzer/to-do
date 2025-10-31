@@ -200,7 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const span = document.createElement("span");
     span.textContent = task.text;
-    span.onclick = () => editTask(span, task);
+    span.onclick = () => editTask(li, task);
 
     const time = document.createElement("div");
     time.className = "task-time";
@@ -238,23 +238,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Редактирование задачи
-  function editTask(span, task) {
-    const inputEdit = document.createElement("input");
-    inputEdit.value = task.text;
-    inputEdit.className = "edit";
-    span.replaceWith(inputEdit);
-    inputEdit.focus();
+  // Редактирование задачи (название, дата, время)
+  function editTask(li, task) {
+    li.innerHTML = "";
+    const textEdit = document.createElement("input");
+    textEdit.className = "edit";
+    textEdit.value = task.text;
 
-    inputEdit.onkeydown = e => {
-      if (e.key === "Enter") {
-        task.text = inputEdit.value.trim() || task.text;
-        save();
-        reloadLists();
-      }
+    const dateEdit = document.createElement("input");
+    dateEdit.type = "date";
+    dateEdit.value = task.date;
+
+    const timeEdit = document.createElement("input");
+    timeEdit.type = "time";
+    timeEdit.value = task.time;
+
+    const saveBtn = document.createElement("button");
+    saveBtn.textContent = "💾";
+    saveBtn.onclick = () => {
+      task.text = textEdit.value.trim() || task.text;
+      task.date = dateEdit.value || task.date;
+      task.time = timeEdit.value || task.time;
+      sortTasks();
+      save();
+      reloadLists();
     };
 
-    inputEdit.onblur = () => reloadLists();
+    li.append(textEdit, dateEdit, timeEdit, saveBtn);
   }
 
   function reloadLists() {
@@ -269,8 +279,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function sortTasks() {
     tasks.sort((a, b) => {
-      if (a.date === b.date) return a.time.localeCompare(b.time);
-      return a.date.localeCompare(b.date);
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare === 0) return a.time.localeCompare(b.time);
+      return dateCompare;
     });
   }
 
@@ -310,12 +321,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const newOrder = [];
     const items = todoList.querySelectorAll("li");
     items.forEach(li => {
-      const text = li.querySelector("span").textContent;
+      const text = li.querySelector("span")?.textContent;
       const task = tasks.find(t => t.text === text && !t.done);
       if (task) newOrder.push(task);
     });
     const doneTasks = tasks.filter(t => t.done);
     tasks = [...newOrder, ...doneTasks];
+    sortTasks();
     save();
   }
 });
