@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
       box-shadow: 0 3px 8px rgba(0,0,0,0.1);
       margin-bottom: 20px;
     }
-    input[type=text], select {
+    input[type=text], select, input[type=date] {
       border: 1px solid #ccc;
       border-radius: 6px;
       padding: 8px;
@@ -42,7 +42,20 @@ document.addEventListener("DOMContentLoaded", () => {
       transition: 0.2s;
     }
     button:hover { background: #58a8dc; }
-    ul { list-style: none; padding: 0; width: 100%; max-width: 400px; }
+    .lists {
+      display: flex;
+      gap: 30px;
+      width: 100%;
+      max-width: 900px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      width: 100%;
+      max-width: 400px;
+    }
     li {
       background: white;
       border-radius: 10px;
@@ -64,6 +77,11 @@ document.addEventListener("DOMContentLoaded", () => {
       width: 90%;
       font-size: 14px;
     }
+    h2 {
+      color: white;
+      text-align: center;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
   `;
   document.head.appendChild(style);
 
@@ -78,6 +96,10 @@ document.addEventListener("DOMContentLoaded", () => {
   input.type = "text";
   input.placeholder = "Название задачи";
   input.required = true;
+
+  // Поле для даты
+  const dateInput = document.createElement("input");
+  dateInput.type = "date";
 
   // Выпадающие списки времени
   const hoursSelect = document.createElement("select");
@@ -102,32 +124,51 @@ document.addEventListener("DOMContentLoaded", () => {
   addBtn.type = "submit";
   addBtn.textContent = "Добавить";
 
-  form.append(input, hoursSelect, minutesSelect, addBtn);
-  const list = document.createElement("ul");
-  document.body.append(title, form, list);
+  form.append(input, dateInput, hoursSelect, minutesSelect, addBtn);
+
+  // Контейнер для списков
+  const listsContainer = document.createElement("div");
+  listsContainer.className = "lists";
+
+  const todoTitle = document.createElement("h2");
+  todoTitle.textContent = "Невыполненные задачи";
+  const doneTitle = document.createElement("h2");
+  doneTitle.textContent = "Выполненные задачи";
+
+  const todoList = document.createElement("ul");
+  const doneList = document.createElement("ul");
+
+  const todoSection = document.createElement("div");
+  const doneSection = document.createElement("div");
+  todoSection.append(todoTitle, todoList);
+  doneSection.append(doneTitle, doneList);
+  listsContainer.append(todoSection, doneSection);
+
+  document.body.append(title, form, listsContainer);
 
   // Хранилище 
   let tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
-  sortTasks(); // сортировка при загрузке
-  tasks.forEach(addTaskToDOM);
+  sortTasks();
+  reloadLists();
 
   // Добавление задачи 
   form.onsubmit = e => {
     e.preventDefault();
     const text = input.value.trim();
+    const date = dateInput.value;
     const time = `${hoursSelect.value}:${minutesSelect.value}`;
-    if (!text) return;
+    if (!text || !date) return;
 
-    const task = { text, time, done: false };
+    const task = { text, date, time, done: false };
     tasks.push(task);
-    sortTasks(); // сортировка после добавления
+    sortTasks();
     save();
-    reloadList();
+    reloadLists();
     form.reset();
   };
 
   // Отображение задачи 
-  function addTaskToDOM(task) {
+  function addTaskToDOM(task, list) {
     const li = document.createElement("li");
 
     const info = document.createElement("div");
@@ -139,7 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const time = document.createElement("div");
     time.className = "task-time";
-    time.textContent = task.time ? `⏰ ${task.time}` : "";
+    time.textContent = `📅 ${task.date} ⏰ ${task.time}`;
 
     info.append(span, time);
 
@@ -147,16 +188,16 @@ document.addEventListener("DOMContentLoaded", () => {
     doneBtn.textContent = "✓";
     doneBtn.onclick = () => {
       task.done = !task.done;
-      li.classList.toggle("done");
       save();
+      reloadLists();
     };
 
     const delBtn = document.createElement("button");
     delBtn.textContent = "✗";
     delBtn.onclick = () => {
       tasks = tasks.filter(t => t !== task);
-      li.remove();
       save();
+      reloadLists();
     };
 
     li.append(doneBtn, info, delBtn);
@@ -176,21 +217,27 @@ document.addEventListener("DOMContentLoaded", () => {
       if (e.key === "Enter") {
         task.text = inputEdit.value.trim() || task.text;
         save();
-        reloadList();
+        reloadLists();
       }
     };
 
-    inputEdit.onblur = () => reloadList();
+    inputEdit.onblur = () => reloadLists();
   }
 
-  function reloadList() {
-    list.innerHTML = "";
+  // Перерисовка списков
+  function reloadLists() {
+    todoList.innerHTML = "";
+    doneList.innerHTML = "";
     sortTasks();
-    tasks.forEach(addTaskToDOM);
+    tasks.forEach(t => addTaskToDOM(t, t.done ? doneList : todoList));
   }
 
+  // Сортировка по дате и времени
   function sortTasks() {
-    tasks.sort((a, b) => a.time.localeCompare(b.time));
+    tasks.sort((a, b) => {
+      if (a.date === b.date) return a.time.localeCompare(b.time);
+      return a.date.localeCompare(b.date);
+    });
   }
 
   function save() {
